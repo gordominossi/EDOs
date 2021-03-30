@@ -19,7 +19,19 @@ class Function:
         return self.fArray
 
 
-def fixedPointIteration(time: float, currentU: np.ndarray, step: float, phi: phiType) -> np.ndarray:
+def solveEDO(u0: np.ndarray, phi: phiType, period: np.ndarray, discretization: int):
+    U = np.array(u0)
+    step = (period[1] - period[0]) / discretization
+    currentU = u0
+    nextU = currentU
+    for iterations in range(discretization):
+        nextU = iteration(
+            period[0] + step * iterations, currentU, step, phi)
+        np.append(U, nextU)
+    return U
+
+
+def iteration(time: float, currentU: np.ndarray, step: float, phi: phiType) -> np.ndarray:
     nextU = currentU + step * phi(time, currentU, step)
     return nextU
 
@@ -63,7 +75,8 @@ def implicitEulerPhi(f: Function, time: float, currentU: np.ndarray, step: float
             break
         nextU = newtonIteration(currentNextUAproximation,
                                 previousNextUAproximation)
-        print("Newton iterations: ", iterations, ". Error: ", "{:.3E}".format(Decimal(error)), "\r")
+        print("Newton iterations: ", iterations, ". Error: ",
+              "{:.3E}".format(Decimal(error)), "\r")
     print("\n")
 
     return nextU
