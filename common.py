@@ -1,5 +1,6 @@
 from typing import Callable
 import numpy as np
+from decimal import Decimal
 
 MAX_NEWTON_ITERATIONS = 10
 phiType = Callable[[float, np.ndarray, float], np.ndarray]
@@ -32,28 +33,37 @@ def RK44Phi(f: Function, time: float, currentU: np.ndarray, step: float) -> phiT
 
 
 def implicitEulerPhi(f: Function, time: float, currentU: np.ndarray, step: float) -> phiType:
-    def g(time: float, nextU: np.ndarray, currentU: np.ndarray) -> fType:
-        return np.array(nextU - step * f.getFs() - currentU)
+    def generateG(time: float, nextU: np.ndarray, currentU: np.ndarray) -> Function:
+        return Function(np.array(nextU - step * f.getFs() - currentU))
 
     # TODO: Implement jacobian
-    def jacobian(time: float, nextU: np.ndarray, currentU: np.ndarray) -> matrixType:
-        return np.full((len(nextU), len(nextU)), g(time, nextU, currentU))
+    def generateJacobian(time: float, nextU: np.ndarray, currentU: np.ndarray) -> matrixType:
+        g = generateG(time, nextU, currentU)
+        jacobian = np.empty((len(nextU), len((nextU))))
+        gs = g.getFs()
+        for i in gs:
+            jacobian[i] = np.gradient(gs[i](time, nextU))
+        return jacobian
 
     def inverseJacobian(time: float, nextU: np.ndarray, currentU: np.ndarray) -> matrixType:
-        return np.linalg.inv(jacobian(time, nextU, currentU))
+        return np.linalg.inv(generateJacobian(time, nextU, currentU))
 
     def newtonIteration(currentNextUAproximation: np.ndarray, previousNextUAproximation: np.ndarray):
-        return currentNextUAproximation - inverseJacobian(time, currentNextUAproximation, previousNextUAproximation) * g(time, currentNextUAproximation, previousNextUAproximation)
+        g = generateG(time, currentNextUAproximation,
+                      previousNextUAproximation)
+        return currentNextUAproximation - inverseJacobian(time, currentNextUAproximation, previousNextUAproximation) * g(time + step, currentNextUAproximation)
 
     # TODO: Verify precision of Newton's method below
     nextU = previousNextUAproximation = currentNextUAproximation = currentU
     error = 0
-    for dummyIterationCounter in range(MAX_NEWTON_ITERATIONS):
+    for iterations in range(MAX_NEWTON_ITERATIONS):
         previousNextUAproximation = currentNextUAproximation
         currentNextUAproximation = nextU
         if error < 1e-16:
             break
         nextU = newtonIteration(currentNextUAproximation,
                                 previousNextUAproximation)
+        print("Newton iterations: ", iterations, ". Error: ", "{:.3E}".format(Decimal(error)), "\r")
+    print("\n")
 
     return nextU
