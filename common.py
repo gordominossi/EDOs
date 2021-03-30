@@ -3,6 +3,7 @@ import numpy as np
 
 MAX_NEWTON_ITERATIONS = 10
 phiType = Callable[[float, np.ndarray, float], np.ndarray]
+fType = Callable[[float, np.ndarray], np.ndarray]
 matrixType = np.ndarray
 
 
@@ -31,7 +32,7 @@ def RK44Phi(f: Function, time: float, currentU: np.ndarray, step: float) -> phiT
 
 
 def implicitEulerPhi(f: Function, time: float, currentU: np.ndarray, step: float) -> phiType:
-    def g(time: float, nextU: np.ndarray, currentU) -> np.ndarray:
+    def g(time: float, nextU: np.ndarray, currentU: np.ndarray) -> fType:
         return np.array(nextU - step * f.getFs() - currentU)
 
     # TODO: Implement jacobian
