@@ -1,4 +1,4 @@
-from typing import Callable
+from typing import Callable, List
 import numpy as np
 from decimal import Decimal
 
@@ -9,26 +9,36 @@ matrixType = np.ndarray
 
 
 class Function:
-    def __init__(self, fMatrix: np.ndarray):
-        self.fMatrix = fMatrix
+    def __init__(self, fArray: List[fType]):
+        self.fArray = fArray
 
     def __call__(self, time: float, u: np.ndarray) -> np.ndarray:
-        return np.matmul(self.fMatrix, u)
+        result = np.empty(len(u))
+        for i in range(len(u)):
+            result[i] = self.fArray[i](time, u)
+        return result
 
     def getFs(self) -> np.ndarray:
-        return self.fMatrix
+        return self.fArray
 
 
-def solveEDO(u0: np.ndarray, phi: phiType, period: np.ndarray, discretization: int):
-    U = np.array(u0)
-    step = (period[1] - period[0]) / discretization
-    currentU = u0
-    nextU = currentU
+def solveEDO(u0: np.ndarray, phi: phiType, interval: np.ndarray, discretization: int):
+    U = np.empty((discretization + 1, len(u0)))
+    U[0] = u0
+    step = (interval[1] - interval[0]) / discretization
     for iterations in range(discretization):
-        nextU = iteration(
-            period[0] + step * iterations, currentU, step, phi)
-        np.append(U, nextU)
+        U[iterations + 1] = iteration(interval[0] + step * iterations,
+                                      U[iterations], step, phi)
     return U
+
+
+def getSolution(exactF: fType, interval: np.ndarray, discretization: int):
+    X = np.empty((discretization, len(exactF) + 1))
+    step = (interval[1] - interval[0]) / discretization
+    for iterations in range(discretization):
+        for i in range(len(exactF)):
+            X[iterations, i] = exactF[i](interval[0] + iterations * step)
+    return X
 
 
 def iteration(time: float, currentU: np.ndarray, step: float, phi: phiType) -> np.ndarray:
@@ -37,7 +47,7 @@ def iteration(time: float, currentU: np.ndarray, step: float, phi: phiType) -> n
 
 
 def generateRK44Phi(f: Function) -> phiType:
-    def phi(time: float, currentU: np.ndarray, step: float):
+    def phi(time: float, currentU: np.ndarray, step: float) -> np.ndarray:
         kappa1 = f(time, currentU)
         kappa2 = f(time + step / 2, currentU + step * kappa1 / 2)
         kappa3 = f(time + step / 2, currentU + step * kappa2 / 2)
@@ -47,13 +57,15 @@ def generateRK44Phi(f: Function) -> phiType:
 
 
 def generateimplicitEulerPhi(f: Function) -> phiType:
-    def phi(time: float, currentU: np.ndarray, step: float)
-        def generateG(time: float, nextU: np.ndarray, currentU: np.ndarray) -> Function:
-            return Function(np.array(nextU - step * f.getFs() - currentU))
+    def phi(time: float, currentU: np.ndarray, step: float) -> np.ndarray:
+        def generateG(currentU: np.ndarray) -> Function:
+            def g(time: float, nextU: np.ndarray):
+                return np.array(nextU - step * f.getFs() - currentU)
+            return g
 
         # TODO: Implement jacobian
         def generateJacobian(time: float, nextU: np.ndarray, currentU: np.ndarray) -> matrixType:
-            g = generateG(time, nextU, currentU)
+            g = generateG(currentU)
             jacobian = np.empty((len(nextU), len((nextU))))
             gs = g.getFs()
             for i in gs:
@@ -64,8 +76,7 @@ def generateimplicitEulerPhi(f: Function) -> phiType:
             return np.linalg.inv(generateJacobian(time, nextU, currentU))
 
         def newtonIteration(currentNextUAproximation: np.ndarray, previousNextUAproximation: np.ndarray):
-            g = generateG(time, currentNextUAproximation,
-                        previousNextUAproximation)
+            g = generateG(previousNextUAproximation)
             return currentNextUAproximation - inverseJacobian(time, currentNextUAproximation, previousNextUAproximation) * g(time + step, currentNextUAproximation)
 
         # TODO: Verify precision of Newton's method below
@@ -79,7 +90,7 @@ def generateimplicitEulerPhi(f: Function) -> phiType:
             nextU = newtonIteration(currentNextUAproximation,
                                     previousNextUAproximation)
             print("Newton iterations: ", iterations, ". Error: ",
-                "{:.3E}".format(Decimal(error)), "\r")
+                  "{:.3E}".format(Decimal(error)), "\r")
         print("\n")
 
         return nextU
