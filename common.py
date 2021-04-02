@@ -9,14 +9,14 @@ matrixType = np.ndarray
 
 
 class Function:
-    def __init__(self, fArray: np.ndarray):
-        self.fArray = fArray
+    def __init__(self, fMatrix: np.ndarray):
+        self.fMatrix = fMatrix
 
     def __call__(self, time: float, u: np.ndarray) -> np.ndarray:
-        return np.array([self.fArray[i](time, u[i]) for i in len(self.fArray)])
+        return np.matmul(self.fMatrix, u)
 
     def getFs(self) -> np.ndarray:
-        return self.fArray
+        return self.fMatrix
 
 
 def solveEDO(u0: np.ndarray, phi: phiType, period: np.ndarray, discretization: int):
@@ -54,7 +54,7 @@ def implicitEulerPhi(f: Function, time: float, currentU: np.ndarray, step: float
         jacobian = np.empty((len(nextU), len((nextU))))
         gs = g.getFs()
         for i in gs:
-            jacobian[i] = np.gradient(gs[i](time, nextU))
+            jacobian[i] = np.gradient(gs[i](time, nextU), time)
         return jacobian
 
     def inverseJacobian(time: float, nextU: np.ndarray, currentU: np.ndarray) -> matrixType:
