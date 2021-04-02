@@ -27,8 +27,8 @@ def solveEDO(u0: np.ndarray, phi: phiType, interval: np.ndarray, discretization:
     U[0] = u0
     step = (interval[1] - interval[0]) / discretization
     for iterations in range(discretization):
-        U[iterations + 1] = iteration(interval[0] + step * iterations,
-                                      U[iterations], step, phi)
+        U[iterations + 1] = U[iterations] + \
+            step * phi(interval[0] + step * iterations, U[iterations], step)
     return U
 
 
@@ -41,18 +41,13 @@ def getSolution(exactF: fType, interval: np.ndarray, discretization: int):
     return X
 
 
-def iteration(time: float, currentU: np.ndarray, step: float, phi: phiType) -> np.ndarray:
-    nextU = currentU + step * phi(time, currentU, step)
-    return nextU
-
-
 def generateRK44Phi(f: Function) -> phiType:
     def phi(time: float, currentU: np.ndarray, step: float) -> np.ndarray:
         kappa1 = f(time, currentU)
         kappa2 = f(time + step / 2, currentU + step * kappa1 / 2)
         kappa3 = f(time + step / 2, currentU + step * kappa2 / 2)
         kappa4 = f(time + step, currentU + step * kappa3)
-        return kappa1 / 6 + kappa2 / 3 + kappa3 / 3 + kappa4 / 6
+        return (kappa1 + 2 * kappa2 + 2 * kappa3 + kappa4) / 6
     return phi
 
 
