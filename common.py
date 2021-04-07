@@ -2,24 +2,24 @@ from typing import Callable, List
 import numpy as np
 from decimal import Decimal
 
-MAX_NEWTON_ITERATIONS = 10
+MAX_NEWTON_ITERATIONS = 7
 phiType = Callable[[float, np.ndarray, float], np.ndarray]
 fType = Callable[[float, np.ndarray], np.ndarray]
+jacobianType = List[List[Callable[[float, float, np.ndarray], float]]]
 matrixType = np.ndarray
 
 
 class Function:
     def __init__(self, fArray: List[fType]):
         self.fArray = fArray
+        for i in range(len(fArray)):
+            print(fArray[i](0, np.array([1, 1, 1, -1])))
 
-    def __call__(self, time: float, u: np.ndarray) -> np.ndarray:
-        result = np.empty(len(u))
-        for i in range(len(u)):
-            result[i] = self.fArray[i](time, u)
+    def __call__(self, time: float, U: np.ndarray) -> np.ndarray:
+        result = np.empty(len(self.fArray))
+        for i in range(len(self.fArray)):
+            result[i] = self.fArray[i](time, U)
         return result
-
-    def getFs(self) -> np.ndarray:
-        return self.fArray
 
 
 def solveEDO(u0: np.ndarray, phi: phiType, interval: np.ndarray, discretization: int):
@@ -33,9 +33,9 @@ def solveEDO(u0: np.ndarray, phi: phiType, interval: np.ndarray, discretization:
 
 
 def getSolution(exactF: fType, interval: np.ndarray, discretization: int):
-    X = np.empty((discretization, len(exactF) + 1))
+    X = np.empty((discretization + 1, len(exactF)))
     step = (interval[1] - interval[0]) / discretization
-    for iterations in range(discretization):
+    for iterations in range(discretization + 1):
         for i in range(len(exactF)):
             X[iterations, i] = exactF[i](interval[0] + iterations * step)
     return X
@@ -51,20 +51,20 @@ def generateRK44Phi(f: Function) -> phiType:
     return phi
 
 
-def generateimplicitEulerPhi(f: Function) -> phiType:
+def generateImplicitEulerPhi(f: Function, J: jacobianType) -> phiType:
     def phi(time: float, currentU: np.ndarray, step: float) -> np.ndarray:
         def generateG(currentU: np.ndarray) -> Function:
             def g(time: float, nextU: np.ndarray):
-                return np.array(nextU - step * f.getFs() - currentU)
+                return nextU - step * f(time, nextU) - currentU
             return g
 
-        # TODO: Implement jacobian
         def generateJacobian(time: float, nextU: np.ndarray, currentU: np.ndarray) -> matrixType:
-            g = generateG(currentU)
-            jacobian = np.empty((len(nextU), len((nextU))))
-            gs = g.getFs()
-            for i in gs:
-                jacobian[i] = np.gradient(gs[i](time, nextU), time)
+            jacobian = np.empty((len(J), len(J)))
+            for i in range(len(J)):
+                line = np.empty(len(J[i]))
+                for j in range(len(J[i])):
+                    line[j] = J[i][j](time, step, *nextU)
+                jacobian[i] = line
             return jacobian
 
         def inverseJacobian(time: float, nextU: np.ndarray, currentU: np.ndarray) -> matrixType:
@@ -74,19 +74,11 @@ def generateimplicitEulerPhi(f: Function) -> phiType:
             g = generateG(previousNextUAproximation)
             return currentNextUAproximation - inverseJacobian(time, currentNextUAproximation, previousNextUAproximation) * g(time + step, currentNextUAproximation)
 
-        # TODO: Verify precision of Newton's method below
         nextU = previousNextUAproximation = currentNextUAproximation = currentU
-        error = 0
-        for iterations in range(MAX_NEWTON_ITERATIONS):
+        for dummyIterationCounter in range(MAX_NEWTON_ITERATIONS):
             previousNextUAproximation = currentNextUAproximation
             currentNextUAproximation = nextU
-            if error < 1e-16:
-                break
             nextU = newtonIteration(currentNextUAproximation,
                                     previousNextUAproximation)
-            print("Newton iterations: ", iterations, ". Error: ",
-                  "{:.3E}".format(Decimal(error)), "\r")
-        print("\n")
-
         return nextU
     return phi
